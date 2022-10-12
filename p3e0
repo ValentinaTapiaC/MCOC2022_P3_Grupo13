@@ -1,0 +1,148 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Oct  3 22:09:23 2022
+
+@author: solel
+"""
+
+import networkx as nx
+import osmnx as ox
+import geopandas
+
+import matplotlib
+import matplotlib.pyplot as plt
+
+
+plt.figure()
+ax = plt.subplot(111)
+
+
+
+ox.settings.log_console = False
+ox.settings.use_cache = True
+
+ox.config(use_cache=True, log_console=True)
+# G = nx.Graph()
+
+G = ox.graph_from_bbox(
+    north = -33.3829, 
+    south = -33.4194, 
+    east = -70.4877, 
+    west = -70.5360, 
+    network_type = "drive", 
+    clean_periphery = True)
+
+
+from matplotlib.pylab import *
+
+gtfs = {}
+
+fname = "gtfsv34/shapes.txt"
+
+micros = []
+
+with open(fname, "r") as fid:
+    for line_number, line in enumerate(fid):
+        if line_number > 0:
+            recorrido, lat, lon, corr = line.split(sep = ",")
+            #print(recorrido, lat, lon)
+            
+            lat = double(lat)
+            lon = double(lon)
+            corr = int32(corr)
+            
+            if not recorrido in micros: #lista con todas las micros(no repetidas)
+                micros.append(recorrido)
+                
+            if not recorrido in gtfs:     #si es un recorrido nuevo
+                gtfs[recorrido] = [[lat], [lon], [corr]]
+                
+                
+            else:
+                gtfs[recorrido][0].append(lat) #se va quedando con los ultimos datos
+                gtfs[recorrido][1].append(lon)
+                gtfs[recorrido][2].append(corr)
+                
+            gtfs[recorrido]
+   
+    
+micros.sort()
+#print(micros)
+
+           #rojo,  naranjo oscuro, naranjo claro, amarillo, 
+           #verde limon, verde oscuro, verde caca, celeste, 
+           #celeste oscuro, azul, mas azul, rosado, 
+           #rosado claro, salmon, burdeo, cafe
+           
+  
+colores = ["#FF4D33", "#F67404", "#F8A41A", "#FDDB27", 
+           "#C3FD27", "#58BF57", "#246A37", "#3FFAF2", 
+           "#3FDBFA", "#3097ED", "#3061ED", "#F648C7", 
+           "#FD72B9", "#FD7284", "#8F0907", "#693C3B"]      
+   
+iniciales = ["1", "2", "3" ,"4", "5", "6", "7", 
+             "B", "C", "D", "E", "F", "G", "H", "I", "J"]  
+                
+
+edgeinfo = {}
+
+for e in G.edges: #esto itera los edges
+    #nodo de inicio, nodo final, si hay mas de una calle que conecta los dos puntos
+    ni, nj, k = e
+    edgeinfo = G.edges[ni, nj, k]
+
+
+ka = []            
+
+for key in gtfs.keys():
+    lat, lon, corr = gtfs[key]
+
+    if not key in ka:
+        ka.append(key)
+         
+   
+for i in range(len(iniciales)):
+    
+    for key in gtfs.keys():
+
+        if key[0] == iniciales[i]:
+            lat, lon, corr = gtfs[key]
+            plot(lon, lat, color = colores[i])
+         
+            
+    
+#-------------GUARDAR IMAGEN--------------
+
+plt.savefig("imagen1.png", dpi = 100, bbox_inches = "tight", pad_inches = 0.5)   
+    
+#---------------GUARDAR PDF----------------
+
+from reportlab.pdfgen import canvas
+
+c = canvas.Canvas("mapa.pdf")
+c.save()
+
+#-----------------------------------------
+    
+
+pos = {}
+#grafica los nodos (coordenadas) con las uniones
+for nodo in G.nodes:
+    pos[nodo] = (G.nodes[nodo]["x"], G.nodes[nodo]["y"]) 
+
+
+
+gdf_nodes, gdf_edges = ox.graph_to_gdfs(G)
+
+gdf_edges[gdf_edges.highway =="secondary"].plot(ax = ax, color = "#8C8C87", linewidth=1)
+gdf_edges[gdf_edges.highway =="primary"].plot(ax = ax, color = "#8C8C87", linewidth=1)
+gdf_edges[gdf_edges.highway =="motorway"].plot(ax = ax, color = "#FEFA02", linewidth=2) #amarillo
+
+plt.savefig("imagen2.png", dpi = 100, bbox_inches = "tight", pad_inches = 0.5)   
+
+nx.write_gpickle(G, "grafo_santiago_grupo13.gpickle")
+
+plt.axis("equal")
+
+plt.show()
+
